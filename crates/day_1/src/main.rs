@@ -1,9 +1,11 @@
 use std::fs;
 
+use regex::Regex;
+
 fn main() {
     println!("Hello, world!");
 
-    let file_path = "crates/day_1/assets/puzzleinput.txt";
+    let file_path = "crates/day_1/assets/example2.txt";
     println!("In file {}", file_path);
 
     let contents = fs::read_to_string(file_path)
@@ -11,11 +13,14 @@ fn main() {
 
     println!("With text:\n{contents}");
 
-    let val = check_text(contents);
+    let val = check_text_part_1(contents);
     println!("Computed Value: {}", val);
+
+    let part2 = check_text_part_2(contents);
+    println!("Part 2 Value: {}", val);
 }
 
-fn check_text(input: String) -> i32 {
+fn check_text_part_1(input: String) -> i32 {
     let mut total_value: i32 = 0;
     let mut first_char: Option<char> = None;
     let mut last_char: Option<char> = None;
@@ -60,4 +65,18 @@ fn compute_chars_to_i32(first_char: Option<char>, last_char: Option<char>) -> i3
     let str_val = format!("{}{}", first_char.unwrap(), last_char.unwrap());
     let val = str_val.parse::<i32>().unwrap();
     return val;
+}
+
+fn check_text_part_2(input: String) -> i32 {
+
+    let re = Regex::new(r"(?m)^([^:]+):([0-9]+):(.+)$").unwrap();
+
+    let mut results = vec![];
+    for (_, [path, lineno, line]) in re.captures_iter(&input).map(|c| c.extract()) {
+        results.push((path, lineno.parse::<i32>(), line));
+    }
+
+    let mut total_value: i32 = 0;
+
+    total_value
 }
