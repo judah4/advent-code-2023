@@ -13,11 +13,11 @@ fn main() {
 
     println!("With text:\n{contents}");
 
-    let val = check_text_part_1(contents);
+    let val = check_text_part_1(contents.clone());
     println!("Computed Value: {}", val);
 
-    let part2 = check_text_part_2(contents);
-    println!("Part 2 Value: {}", val);
+    let part2 = check_text_part_2(contents.clone());
+    println!("Part 2 Value: {}", part2);
 }
 
 fn check_text_part_1(input: String) -> i32 {
