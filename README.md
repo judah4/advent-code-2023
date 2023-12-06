@@ -2,7 +2,7 @@
 
 Written in Rust.
 
-#
+# How to Run
 
 ```
 cargo run --bin day_1
