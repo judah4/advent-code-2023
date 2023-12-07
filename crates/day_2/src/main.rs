@@ -1,6 +1,5 @@
 use std::{path::PathBuf, fs};
 
-
 const MAX_RED: u32 = 12;
 const MAX_GREEN: u32 = 13;
 const MAX_BLUE: u32 = 14;
@@ -13,6 +12,12 @@ struct GameData {
     blue: u32,
 }
 
+impl GameData {
+    fn get_power(&self) -> u32 {
+        self.red * self.green * self.blue
+    }
+}
+
 fn main() {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("assets\\input.txt");
@@ -23,27 +28,31 @@ fn main() {
         .expect("Should have been able to read the file");
 
     let val = process_games(contents);
-    println!("{}", val);
+    println!("High Total {}", val.0);
+    println!("Power Total {}", val.1);
+
 }
 
 /// Iterate though the lines, format the games, and check if the game fits the expected numbers.
-fn process_games(games: String) -> u32 {
+fn process_games(games: String) -> (u32, u64) {
 
     let mut game_ids_total: u32 = 0;
+    let mut total_power: u64 = 0;
     let mut valid_games = vec![];
     for line in games.lines().into_iter() {
         let game = process_game(line);
-
+        let game_power = game.get_power();
+        total_power += game_power as u64;
         let qualifies = game_qualifies(&game);
         #[cfg(test)]
-        println!("{} => {:?}, Qualifies: {}", line, game, qualifies);
+        println!("{} => {:?}, Qualifies: {}, power {}", line, game, qualifies, game_power);
         if qualifies {
             game_ids_total += game.id;
             valid_games.push(game);
         }
     }
 
-    game_ids_total
+    (game_ids_total, total_power)
 }
 
 /// Take the game string and format into structured game data.
@@ -132,7 +141,7 @@ mod tests {
             .expect("Should have been able to read the file");
         
         let val = process_games(contents.clone());
-        assert_eq!(true, val > 272, "Value should be greater than 272");
+        assert_eq!(true, val.0 > 272, "Value should be greater than 272");
     }
 
     #[test]
@@ -147,7 +156,22 @@ mod tests {
             .expect("Should have been able to read the file");
         
         let val = process_games(contents.clone());
-        assert_eq!(8, val);
+        assert_eq!(8, val.0);
+    }
+
+    #[test]
+    fn example1_part_2_power_test() {
+
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("assets\\example.txt");
+    
+        let file_path = d.display().to_string();
+    
+        let contents = fs::read_to_string(file_path)
+            .expect("Should have been able to read the file");
+        
+        let val = process_games(contents.clone());
+        assert_eq!(2286, val.1);
     }
 
     #[test]
