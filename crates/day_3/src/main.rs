@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, vec};
+use std::{fs, path::PathBuf, vec, collections::HashMap};
 
 #[derive(Debug)]
 enum CellType {
@@ -39,12 +39,15 @@ fn process(contents: String) -> u32 {
             line_length = line.len();
         }
 
+        #[cfg(test)]
+        println!("{}", line);
+
         current_id = create_cells(current_id, &mut cells, line, index);
     }
 
     check_cell_adjacents(&mut cells, line_length);
 
-    let mut sum_total = 0;
+    let mut matched_nums = HashMap::with_capacity(10);
 
     for cell in cells {
         match cell.cell_type {
@@ -52,9 +55,17 @@ fn process(contents: String) -> u32 {
             _ => continue,
         }
 
-        if cell.adjacent_symbol_indices.len() > 0 {
-            sum_total += cell.num_value;
+        if cell.adjacent_symbol_indices.len() > 0 && !matched_nums.contains_key(&cell.id) {
+            matched_nums.insert(cell.id, cell.num_value);
+            println!("Adding cell {} to matched, value: {}", cell.id, cell.num_value);
         }
+    }
+
+    let mut sum_total = 0;
+
+    for pair in matched_nums.iter() {
+        sum_total += pair.1;
+
     }
 
     sum_total
@@ -68,7 +79,7 @@ fn check_cell_adjacents(cells: &mut Vec<Cell>, line_length: usize) {
     while cell_index < cells.len() {
         let cell = cells.get(cell_index).unwrap();
         #[cfg(test)]
-        println!("{cell_index}, {line_offset}, {line_length}, {line_index}, {:?}", cell.cell_type);
+        println!("i:{cell_index}, lo:{line_offset}, ll:{line_length}, li:{line_index}, type:{:?}", cell.cell_type);
 
         match cell.cell_type {
             CellType::Number => {
@@ -110,7 +121,7 @@ fn check_cell_adjacents(cells: &mut Vec<Cell>, line_length: usize) {
                 }
 
                 // Row after
-                if line_offset+1 < max_line {
+                if line_offset + 1 < max_line {
                     if line_index > 0 {
                         check_adjacent(
                             (line_offset + 1) * line_length + line_index - 1,
@@ -128,7 +139,10 @@ fn check_cell_adjacents(cells: &mut Vec<Cell>, line_length: usize) {
                     }
                 }
             }
-            _ => {}
+            _ => {
+                assert!(cell.num_value == 0, "Cell index:{}, id: {} ({}) has number value {} but is not number cell type.", cell.id, cell.id, cell.character, cell.num_value);
+                assert!(!cell.character.is_numeric(), "Cell index:{}, id: {} ({}) is numeric but is not number cell type.", cell.id, cell.id, cell.character);
+            }
         }
 
         line_index += 1;
@@ -170,10 +184,18 @@ fn create_cells(mut current_id: u32, cells: &mut Vec<Cell>, line: &str, line_off
                     num_index_end += 1;
                     end_char = line.chars().nth(num_index_end).unwrap();
                 }
+
+                if end_char.is_numeric() && num_index_end + 1 == line.len() {
+                    num_index_end += 1;
+                }
+
                 let sub_num: &str = &line[i..num_index_end];
+
                 current_number = Some(sub_num.parse::<u32>().unwrap());
             }
         } else if !c.is_alphanumeric() {
+            current_number = None;
+            current_id += 1;
             cell_type = CellType::Symbol;
         }
 
@@ -195,7 +217,7 @@ fn create_cells(mut current_id: u32, cells: &mut Vec<Cell>, line: &str, line_off
 mod tests {
     use std::{fs, path::PathBuf};
 
-    use crate::{create_cells, process, Cell};
+    use crate::{create_cells, process, Cell, CellType};
 
     #[test]
     fn input_test() {
@@ -209,7 +231,10 @@ mod tests {
 
         let val = process(contents.clone());
         assert_ne!(0, val, "Value should not be 0.");
+        //467835
         assert!(604692 > val, "Value is less than 604692.");
+        assert!(522370 < val, "Value is more than 522370.");
+
     }
 
     #[test]
@@ -228,7 +253,7 @@ mod tests {
 
     #[test]
     fn create_cells_test() {
-        let line = "467..114..";
+        let line = "467.*114..";
 
         let line_offset = 0;
         let mut cells: Vec<Cell> = Vec::<Cell>::with_capacity(line.len());
@@ -240,30 +265,98 @@ mod tests {
         assert_ne!(0, current_id);
 
         let cell = cells.get(0).unwrap();
+        assert_eq!(0, cell.index);
         assert_eq!(1, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
         assert_eq!(467, cell.num_value);
         let cell = cells.get(1).unwrap();
+        assert_eq!(1, cell.index);
         assert_eq!(1, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
         assert_eq!(467, cell.num_value);
         let cell = cells.get(2).unwrap();
         assert_eq!(1, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
         assert_eq!(467, cell.num_value);
         let cell = cells.get(3).unwrap();
         assert_eq!(2, cell.id);
+        assert!(matches!(cell.cell_type, CellType::None));
         let cell = cells.get(4).unwrap();
         assert_eq!(3, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Symbol));
         let cell = cells.get(5).unwrap();
         assert_eq!(4, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
         assert_eq!(114, cell.num_value);
         let cell = cells.get(6).unwrap();
         assert_eq!(4, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
         assert_eq!(114, cell.num_value);
         let cell = cells.get(7).unwrap();
         assert_eq!(4, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
         assert_eq!(114, cell.num_value);
         let cell = cells.get(8).unwrap();
         assert_eq!(5, cell.id);
+        assert!(matches!(cell.cell_type, CellType::None));
         let cell = cells.get(9).unwrap();
+        assert_eq!(9, cell.index);
         assert_eq!(6, cell.id);
+        assert!(matches!(cell.cell_type, CellType::None));
+    }
+
+    #[test]
+    fn create_cells_test_2() {
+        let line = "1.12*123.12";
+
+        let line_offset = 0;
+        let mut cells: Vec<Cell> = Vec::<Cell>::with_capacity(line.len());
+        let mut current_id = 0;
+
+        current_id = create_cells(current_id, &mut cells, line, line_offset);
+
+        assert_eq!(line.len(), cells.len());
+        assert_ne!(0, current_id);
+
+        let cell = cells.get(0).unwrap();
+        assert_eq!(0, cell.index);
+        assert_eq!(1, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
+        assert_eq!(1, cell.num_value);
+        let cell = cells.get(1).unwrap();
+        assert_eq!(1, cell.index);
+        assert_eq!(2, cell.id);
+        assert!(matches!(cell.cell_type, CellType::None));
+        let cell = cells.get(2).unwrap();
+        assert_eq!(3, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
+        assert_eq!(12, cell.num_value);
+        let cell = cells.get(3).unwrap();
+        assert_eq!(3, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
+        assert_eq!(12, cell.num_value);
+        let cell = cells.get(4).unwrap();
+        assert_eq!(4, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Symbol));
+        let cell = cells.get(5).unwrap();
+        assert_eq!(5, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
+        assert_eq!(123, cell.num_value);
+        let cell = cells.get(6).unwrap();
+        assert_eq!(5, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
+        assert_eq!(123, cell.num_value);
+        let cell = cells.get(7).unwrap();
+        assert_eq!(5, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
+        assert_eq!(123, cell.num_value);
+        let cell = cells.get(8).unwrap();
+        assert_eq!(6, cell.id);
+        assert!(matches!(cell.cell_type, CellType::None));
+        let cell = cells.get(9).unwrap();
+        assert_eq!(9, cell.index);
+        assert_eq!(7, cell.id);
+        assert!(matches!(cell.cell_type, CellType::Number));
+        assert_eq!(12, cell.num_value);
     }
 }
