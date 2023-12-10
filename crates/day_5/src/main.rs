@@ -11,25 +11,45 @@ enum ParsingState {
     Humid2Loc,
 }
 
-struct Converter {   
+struct ConverterRange {   
     start_from: u64,
     end_from: u64,
 
     start_to: u64,
+
+    range: u64,
 }
 
-impl Converter {
+impl ConverterRange {
     fn is_in_range(&self, num: u64) -> bool {
         num >= self.start_from && num <= self.end_from
     }
 
-    fn convert(&self, num: u64) -> u64 {
+    fn convert(&self, num: u64) -> Result<u64, String> {
         if !self.is_in_range(num) {
-            return num;
+            return Err(format!("number {} is not in range", num));
         }
 
         let offset = num - self.start_from;
-        return self.start_to + offset;
+        return Ok(self.start_to + offset);
+    }
+}
+
+struct Converter {   
+    converters: Vec<ConverterRange>,
+}
+
+impl Converter {
+
+    fn convert(&self, num: u64) -> u64 {
+
+        for ranger in self.converters.iter() {
+            if ranger.is_in_range(num) {
+                return ranger.convert(num).unwrap();
+            }
+        }
+        //Not in range, so it's just a direct map.
+        return num;
     }
 }
 
@@ -45,12 +65,32 @@ fn main() {
     println!("Sum Total {}", val);
 }
 
-fn process(contents: String) -> u32 {
+fn process(contents: String) -> u64 {
 
     let mut parsing_state = ParsingState::Seeds;
 
     let mut seeds = HashSet::new();
-    let mut soil_to_fert = HashMap::new();
+    let mut seed_to_soil = Converter {
+        converters: Vec::<ConverterRange>::with_capacity(10),
+    };
+    let mut soil_to_fert = Converter {
+        converters: Vec::<ConverterRange>::with_capacity(10),
+    };
+    let mut fert_to_water = Converter {
+        converters: Vec::<ConverterRange>::with_capacity(10),
+    }; 
+    let mut water_to_light = Converter {
+        converters: Vec::<ConverterRange>::with_capacity(10),
+    };
+    let mut light_to_temp = Converter {
+        converters: Vec::<ConverterRange>::with_capacity(10),
+    };
+    let mut temp_to_humid = Converter {
+        converters: Vec::<ConverterRange>::with_capacity(10),
+    };
+    let mut humid_to_loc = Converter {
+        converters: Vec::<ConverterRange>::with_capacity(10),
+    };
 
     let lines = contents.lines();
     for line in lines {
@@ -74,33 +114,72 @@ fn process(contents: String) -> u32 {
                     continue;
                 }
 
-                parse_conversion_map(line, &mut soil_to_fert);
+                seed_to_soil.converters.push(parse_conversion_map(line));
 
             },
-            ParsingState::Soil2Fert => {
-                return todo!();
+            ParsingState::Soil2Fert => {             
+                if line.starts_with("fertilizer-to-water") {
+                    parsing_state = ParsingState::Fert2Water; //next
+                    continue;
+                }
+                soil_to_fert.converters.push(parse_conversion_map(line));
             },
-            ParsingState::Fert2Water => {
-                
+            ParsingState::Fert2Water => {                
+                if line.starts_with("water-to-light") {
+                    parsing_state = ParsingState::Water2Light; //next
+                    continue;
+                }
+                fert_to_water.converters.push(parse_conversion_map(line));
             },
-            ParsingState::Water2Light => {
-                
+            ParsingState::Water2Light => {                
+                if line.starts_with("light-to-temperature") {
+                    parsing_state = ParsingState::Light2Temp; //next
+                    continue;
+                }
+                water_to_light.converters.push(parse_conversion_map(line));
             },
-            ParsingState::Light2Temp => {
-                
+            ParsingState::Light2Temp => {                
+                if line.starts_with("temperature-to-humidity") {
+                    parsing_state = ParsingState::Temp2Humid; //next
+                    continue;
+                }
+                light_to_temp.converters.push(parse_conversion_map(line));
             },
-            ParsingState::Temp2Humid => {
-                
+            ParsingState::Temp2Humid => {                
+                if line.starts_with("humidity-to-location") {
+                    parsing_state = ParsingState::Humid2Loc; //next
+                    continue;
+                }
+                temp_to_humid.converters.push(parse_conversion_map(line));
             },
             ParsingState::Humid2Loc => {
-                
+                humid_to_loc.converters.push(parse_conversion_map(line));
+
+                //End State
             },
         }
 
         
     }
 
-    todo!("{}", contents)
+    //get the lowest location number
+    let mut location_num = None;
+
+    for seed in seeds {
+        let soil = seed_to_soil.convert(seed);
+        let fert = soil_to_fert.convert(soil);
+        let water =  fert_to_water.convert(fert);
+        let light  = water_to_light.convert(water);
+        let tempurature = light_to_temp.convert(light);
+        let humid = temp_to_humid.convert(tempurature);
+        let location = humid_to_loc.convert(humid);
+
+        if location_num.is_none() || location_num.unwrap() > location {
+            location_num = Some(location);
+        }
+    }
+
+    location_num.unwrap_or_default()
 }
 
 /// Parse => seeds: 79 14 55 13
@@ -125,7 +204,9 @@ fn parse_numbers(number_line: &str, nums: &mut HashSet<u64>) {
 }
 
 /// Convert a line to parse 50 98 2 to 50 -> 98 and 51 -> 99
-fn parse_conversion_map(number_line: &str, convesions: &mut HashMap<u64, u64>) {
+fn parse_conversion_map(number_line: &str) -> ConverterRange {
+
+    println!("parsing line: {}", number_line);
 
     let split_nums: Vec<&str> = number_line.split(' ').collect();
 
@@ -133,9 +214,14 @@ fn parse_conversion_map(number_line: &str, convesions: &mut HashMap<u64, u64>) {
     let to_num = split_nums[1].parse::<u64>().unwrap();
     let range = split_nums[2].parse::<u64>().unwrap();
 
-    for r in 0..range {
-        convesions.insert(from_num + r, to_num + r);
-    }
+    let converter_range = ConverterRange {
+        start_from: from_num,
+        end_from: from_num + range,
+        start_to: to_num,
+        range: range,
+    };
+
+    converter_range
 }
 
 #[cfg(test)]
