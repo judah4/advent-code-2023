@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, collections::{HashSet, HashMap}};
+use std::{fs, path::PathBuf, collections::HashSet};
 
 enum ParsingState {
     Seeds,
@@ -12,17 +12,15 @@ enum ParsingState {
 }
 
 struct ConverterRange {   
-    start_from: u64,
-    end_from: u64,
-
-    start_to: u64,
+    source_num: u64,
+    dest_num: u64,
 
     range: u64,
 }
 
 impl ConverterRange {
     fn is_in_range(&self, num: u64) -> bool {
-        num >= self.start_from && num <= self.end_from
+        num >= self.source_num && num <= self.source_num + self.range
     }
 
     fn convert(&self, num: u64) -> Result<u64, String> {
@@ -30,8 +28,8 @@ impl ConverterRange {
             return Err(format!("number {} is not in range", num));
         }
 
-        let offset = num - self.start_from;
-        return Ok(self.start_to + offset);
+        let offset = num - self.source_num;
+        return Ok(self.dest_num + offset);
     }
 }
 
@@ -62,7 +60,7 @@ fn main() {
     let contents = fs::read_to_string(file_path).expect("Should have been able to read the file");
 
     let val = process(contents);
-    println!("Sum Total {}", val);
+    println!("Lowest Location {}", val);
 }
 
 fn process(contents: String) -> u64 {
@@ -166,6 +164,7 @@ fn process(contents: String) -> u64 {
     let mut location_num = None;
 
     for seed in seeds {
+
         let soil = seed_to_soil.convert(seed);
         let fert = soil_to_fert.convert(soil);
         let water =  fert_to_water.convert(fert);
@@ -173,6 +172,8 @@ fn process(contents: String) -> u64 {
         let tempurature = light_to_temp.convert(light);
         let humid = temp_to_humid.convert(tempurature);
         let location = humid_to_loc.convert(humid);
+
+        println!("Seed:{seed}, Soil:{soil}, Fert:{fert}, Water:{water}, Light:{light}, Temp:{tempurature}, Humid:{humid}, Loc:{location}");
 
         if location_num.is_none() || location_num.unwrap() > location {
             location_num = Some(location);
@@ -210,14 +211,13 @@ fn parse_conversion_map(number_line: &str) -> ConverterRange {
 
     let split_nums: Vec<&str> = number_line.split(' ').collect();
 
-    let from_num = split_nums[0].parse::<u64>().unwrap();
-    let to_num = split_nums[1].parse::<u64>().unwrap();
+    let dest_num = split_nums[0].parse::<u64>().unwrap();
+    let source_num = split_nums[1].parse::<u64>().unwrap();
     let range = split_nums[2].parse::<u64>().unwrap();
 
     let converter_range = ConverterRange {
-        start_from: from_num,
-        end_from: from_num + range,
-        start_to: to_num,
+        source_num,
+        dest_num,
         range: range,
     };
 
@@ -228,7 +228,7 @@ fn parse_conversion_map(number_line: &str) -> ConverterRange {
 mod day_5_tests {
     use std::{fs, path::PathBuf};
 
-    use crate::process;
+    use crate::{process, ConverterRange};
 
     #[test]
     fn input_test() {
@@ -243,7 +243,7 @@ mod day_5_tests {
         let val = process(contents.clone());
         assert_ne!(0, val, "Value should not be 0.");
         assert!(13 < val, "Value is larger.");
-
+        assert_eq!(382895070, val);
     }
 
     #[test]
@@ -260,4 +260,14 @@ mod day_5_tests {
         assert_eq!(35, val);
     }
 
+    #[test]
+    fn converter_range_test() {
+        let converter_range = ConverterRange {
+            source_num: 50,
+            dest_num: 52,
+            range: 48,
+        };
+        let val = converter_range.convert(55).unwrap();
+        assert_eq!(57, val);
+    }
 }
