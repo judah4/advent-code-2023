@@ -41,7 +41,7 @@ impl ExpandedSpace {
 #[derive(Debug)]
 struct Galaxy {
     position: Vector2,
-    //id: u32,
+    _id: u32,
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -65,17 +65,21 @@ fn main() {
 
     let contents = fs::read_to_string(file_path).expect("Should have been able to read the file");
 
-    let val = process(contents);
+    let expansion_size = 1_000_000;
+
+    println!("Expanding the universe at {} rate", expansion_size);
+
+    let val = process(contents, expansion_size);
     println!("Sum Total {}", val);
 }
 
-fn process(contents: String) -> u32 {
+fn process(contents: String, expansion_size: u32) -> u32 {
 
     // Do an expansion pass and then look up pass.
     
     let unexpanded_space = parse_contents(&contents);
 
-    let expanded_space = expand_space(&unexpanded_space);
+    let expanded_space = expand_space(&unexpanded_space, expansion_size);
 
     let shortest_paths = get_shortest_paths(&expanded_space);
 
@@ -131,11 +135,11 @@ fn parse_contents(contents: &String) -> UnexpandedSpace {
     }
 }
 
-fn expand_space(unexpanded_space: &UnexpandedSpace) -> ExpandedSpace {
+fn expand_space(unexpanded_space: &UnexpandedSpace, expansion_size: u32) -> ExpandedSpace {
     
     let mut galaxies =  HashMap::new();
     let mut expanded_y: u32 = 0;
-    //let mut galaxy_id = 1;
+    let mut galaxy_id = 1;
 
     for y in 0..unexpanded_space.height {
         let mut expanded_x: u32 = 0;
@@ -145,24 +149,26 @@ fn expand_space(unexpanded_space: &UnexpandedSpace) -> ExpandedSpace {
             if space_tile == '#' {
                 let pos = Vector2 { x: expanded_x, y: expanded_y};
                 galaxies.insert(pos.clone(), Galaxy {
-                    //id: galaxy_id,
+                    _id: galaxy_id,
                     position: pos,
                 });
-                //galaxy_id += 1;
+                galaxy_id += 1;
             }
 
+            let mut size_x = 1;
             if unexpanded_space.columns_to_expand.contains(&x) {
-                expanded_x += 1;
+                size_x *= expansion_size;
             }
 
-            expanded_x += 1;
+            expanded_x += size_x;
         }
 
+        let mut size_y = 1;
         if unexpanded_space.rows_to_expand.contains(&y) {
-            expanded_y += 1;
+            size_y *= expansion_size;
         }
 
-        expanded_y += 1;
+        expanded_y += size_y;
     }
 
     ExpandedSpace { galaxies }
@@ -186,8 +192,9 @@ fn get_shortest_paths(expanded_space: &ExpandedSpace) -> Vec<u32> {
                 |p| p.distance(&galaxy2.position),
                 |p| *p == galaxy2.position);
                 let nodes: u32 = result.expect("no path found.").0.len().try_into().unwrap();
+                //let nodes: u32 = result.expect("no path found.").1;
                 //remove the begining node count.
-                #[cfg(test)]
+                //#[cfg(test)]
                 println!("Shortest path between: {:?} and {:?} is {}", galaxy1, galaxy2, nodes - 1);
                 shortest_paths.push(nodes - 1)
         }
@@ -212,8 +219,36 @@ mod day_11_tests {
         let contents =
             fs::read_to_string(file_path).expect("Should have been able to read the file");
 
-        let val = process(contents.clone());
+        let val = process(contents.clone(), 2);
         assert_eq!(374, val);
+    }
+
+    #[test]
+    fn example1_10_test() {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("assets\\example.txt");
+
+        let file_path = d.display().to_string();
+
+        let contents =
+            fs::read_to_string(file_path).expect("Should have been able to read the file");
+
+        let val = process(contents.clone(), 10);
+        assert_eq!(1030, val);
+    }
+
+    #[test]
+    fn example1_1000_test() {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("assets\\example.txt");
+
+        let file_path = d.display().to_string();
+
+        let contents =
+            fs::read_to_string(file_path).expect("Should have been able to read the file");
+
+        let val = process(contents.clone(), 100);
+        assert_eq!(8410, val);
     }
 
 }
