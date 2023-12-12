@@ -38,9 +38,10 @@ impl ExpandedSpace {
     }
 }
 
+#[derive(Debug)]
 struct Galaxy {
     position: Vector2,
-    id: u32,
+    //id: u32,
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -133,31 +134,31 @@ fn parse_contents(contents: &String) -> UnexpandedSpace {
 fn expand_space(unexpanded_space: &UnexpandedSpace) -> ExpandedSpace {
     
     let mut galaxies =  HashMap::new();
-    let mut expanded_x: u32 = 0;
     let mut expanded_y: u32 = 0;
-    let mut galaxy_id = 1;
+    //let mut galaxy_id = 1;
 
     for y in 0..unexpanded_space.height {
+        let mut expanded_x: u32 = 0;
         for x in 0..unexpanded_space.width {
             let space_tile = unexpanded_space.space[y * unexpanded_space.height + x];
 
             if space_tile == '#' {
                 let pos = Vector2 { x: expanded_x, y: expanded_y};
                 galaxies.insert(pos.clone(), Galaxy {
-                    id: galaxy_id,
+                    //id: galaxy_id,
                     position: pos,
                 });
-                galaxy_id += 1;
+                //galaxy_id += 1;
             }
 
-            if unexpanded_space.rows_to_expand.contains(&x) {
+            if unexpanded_space.columns_to_expand.contains(&x) {
                 expanded_x += 1;
             }
 
             expanded_x += 1;
         }
 
-        if unexpanded_space.columns_to_expand.contains(&y) {
+        if unexpanded_space.rows_to_expand.contains(&y) {
             expanded_y += 1;
         }
 
@@ -182,11 +183,13 @@ fn get_shortest_paths(expanded_space: &ExpandedSpace) -> Vec<u32> {
             let result = astar(
                 &galaxy1.position, 
                 |p| expanded_space.get_successors(&p),
-                |p| p.distance(&galaxy2.position) / 2,
+                |p| p.distance(&galaxy2.position),
                 |p| *p == galaxy2.position);
                 let nodes: u32 = result.expect("no path found.").0.len().try_into().unwrap();
-                //remove the begining and end node count.
-                shortest_paths.push(nodes - 2)
+                //remove the begining node count.
+                #[cfg(test)]
+                println!("Shortest path between: {:?} and {:?} is {}", galaxy1, galaxy2, nodes - 1);
+                shortest_paths.push(nodes - 1)
         }
     }
 
@@ -198,22 +201,6 @@ mod day_11_tests {
     use std::{fs, path::PathBuf};
 
     use crate::process;
-
-    #[test]
-    fn input_test() {
-        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("assets\\input.txt");
-
-        let file_path = d.display().to_string();
-
-        let _contents =
-            fs::read_to_string(file_path).expect("Should have been able to read the file");
-
-        //let val = process(contents.clone());
-        //assert_ne!(0, val, "Value should not be 0.");
-        //assert!(13 < val, "Value is larger.");
-
-    }
 
     #[test]
     fn example1_test() {
