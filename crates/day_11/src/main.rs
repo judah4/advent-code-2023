@@ -1,4 +1,5 @@
-use std::{fs, path::PathBuf, collections::{HashSet, HashMap}};
+use std::{fs, path::PathBuf, collections::{HashSet, HashMap}, sync::{Mutex, Arc}};
+use rayon::prelude::*;
 use pathfinding::prelude::astar;
 
 struct UnexpandedSpace {
@@ -9,6 +10,7 @@ struct UnexpandedSpace {
     columns_to_expand: HashSet<usize>,
 }
 
+#[derive(Clone)]
 struct ExpandedSpace {
     galaxies: HashMap<Vector2, Galaxy>,
 }
@@ -38,7 +40,7 @@ impl ExpandedSpace {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Galaxy {
     position: Vector2,
     _id: u32,
@@ -176,30 +178,34 @@ fn expand_space(unexpanded_space: &UnexpandedSpace, expansion_size: u32) -> Expa
 
 fn get_shortest_paths(expanded_space: &ExpandedSpace) -> Vec<u32> {
 
-    let mut shortest_paths = vec![];
+    let shortest_paths_mutex =  Arc::new(Mutex::new(vec![]));
 
     let galaxies: Vec<&Galaxy> = expanded_space.galaxies.values().collect();
     for g1 in 0..galaxies.len() {
-        let galaxy1 = galaxies[g1];
 
         // Go through each galaxy pair until none are left to be paired
-        for g2 in g1+1..galaxies.len() {
-            let galaxy2 = galaxies[g2];
+        (g1+1..galaxies.len()).into_par_iter().for_each(|g2| {
+            let galaxy1 = galaxies[g1].clone();
+            let galaxy2 = galaxies[g2].clone();
+            let shortest_paths_threaded = Arc::clone(&shortest_paths_mutex);
+            let expanded_space_threaded = expanded_space.clone();
 
             let result = astar(
                 &galaxy1.position, 
-                |p| expanded_space.get_successors(&p),
+                |p| expanded_space_threaded.get_successors(&p),
                 |p| p.distance(&galaxy2.position),
                 |p| *p == galaxy2.position);
-                let nodes: u32 = result.expect("no path found.").0.len().try_into().unwrap();
-                //let nodes: u32 = result.expect("no path found.").1;
-                //remove the begining node count.
-                //#[cfg(test)]
-                println!("Shortest path between: {:?} and {:?} is {}", galaxy1, galaxy2, nodes - 1);
-                shortest_paths.push(nodes - 1)
-        }
+            let nodes: u32 = result.expect("no path found.").0.len().try_into().unwrap();
+            //let nodes: u32 = result.expect("no path found.").1;
+            //remove the begining node count.
+            //#[cfg(test)]
+            println!("Shortest path between: {:?} and {:?} is {}", galaxy1, galaxy2, nodes - 1);
+            let mut shortest_paths = shortest_paths_threaded.lock().unwrap();
+            shortest_paths.push(nodes - 1)
+        });
     }
 
+    let shortest_paths = shortest_paths_mutex.lock().unwrap().to_vec();
     shortest_paths
 }
 
